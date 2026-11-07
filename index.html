@@ -84,7 +84,7 @@ ul.rules{line-height:1.9;padding-left:20px;margin:8px 0 16px}
 <div class="wrap">
   <header>
     <h1>🦷 Probabilidad <span>Dental</span></h1>
-    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="calcB">🧮 Calculadora</button><button class="btn gold sm" id="openT">📊 Tabla Z</button><button class="btn sm" id="exitB">🚪 Salir</button></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="fBtn">📘 Fórmulas</button><button class="btn sm" id="calcB">🧮 Calculadora</button><button class="btn gold sm" id="openT">📊 Tabla Z</button><button class="btn sm" id="exitB">🚪 Salir</button></div>
   </header>
   <div class="hud">
     <div class="stat"><div class="l">Ronda</div><div class="v" id="hRound">1</div></div>
@@ -290,13 +290,13 @@ function hud(anim){$('hRound').textContent=round;$('hPts').textContent=pts;$('hS
  if(anim)['hPts','hStreak'].forEach(k=>{const e=$(k);e.classList.remove('pop');void e.offsetWidth;e.classList.add('pop')})}
 function progress(){let done=qi;STAGES.forEach((s,i)=>{const start=PLAN.indexOf(i);const d=Math.max(0,Math.min(s.n,done-start));const seg=$('seg'+i);seg.firstChild.style.width=(d/s.n*100)+'%';seg.classList.toggle('cur',qi<PLAN.length&&PLAN[qi]===i)})}
 
-let guided=false,gSteps=null,gStep=0,gTries=0,gDone=[],lastInput=null;
+let guided=false,gSteps=null,gStep=0,gTries=0,gDone=[],lastInput=null,gRev=0,gHelp=0;
 const half=()=>Math.round(worth()/2);
 function setGuidedBtn(){}
 const TOPIC_INFO={PB:['🃏 Probabilidades','Clásica, suma, condicional, Bayes'],B:['🎯 Binomial','Exactamente, al menos, a lo más'],P:['🔢 Poisson','Exactamente, a lo más, más de'],N:['🔔 Normal','Con tabla Z'],EX:['⏳ Exponencial','Tiempos de espera y Poisson'],RL:['📈 Regresión lineal','Pendiente, predicción, r'],U:['📏 Uniforme','Menos de, más de, entre',1],ED:['📊 Descriptiva','Media, desviación, cuartiles',1]};
 function setTopic(t){if(t!==topic)round=1;topic=t;STAGES=(t==='EX'?STAGES_EX:t==='RL'?STAGES_RL:t==='ED'?STAGES_ED:t==='PB'?STAGES_PB:t==='U'?STAGES_U:t==='N'?STAGES_N:t==='P'?STAGES_P:t==='B'?STAGES_B:STAGES_MIX).filter(x=>x.n>0);rebuildPlan();buildStages();progress();hud(false)}
 function startScreen(){
- updZ(false);$('sName').textContent='Elige un tema';$('sProg').textContent='';
+ $('fBtn').style.display='';updZ(false);$('sName').textContent='Elige un tema';$('sProg').textContent='';
  const tb=k=>'<button class="btn'+(k===topic?' sel':'')+(TOPIC_INFO[k][2]?' nt':'')+'" data-t="'+k+'">'+TOPIC_INFO[k][0]+'<small>'+TOPIC_INFO[k][1]+'</small>'+(TOPIC_INFO[k][2]?'<span class="ntb">No entra en la Prueba 2</span>':'')+'</button>';
  const best=k=>{let b='';try{b=localStorage.getItem('pdent_exam_'+k)||''}catch(e){}return b?'<br>⭐ Mejor nota: '+String(b).replace('.',','):''};
  $('main').innerHTML='<h2 class="center" style="margin:0 0 10px">🎮 Rondas cortas · 5 preguntas</h2>'+
@@ -353,8 +353,8 @@ function finish(outcome,n){
  if(outcome==='ok'){const w=worth();pts+=w;rPts+=w;streak++;rHits++;
   head='<div class="fb ok"><span class="t">🎉 '+pick(CHEERS)+' +'+w+' pts</span>';
   setTimeout(()=>boom(qi===RLEN()-1?3:(w===20?2:1)),30)}
- else if(outcome==='guided'){const w=half();pts+=w;rPts+=w;rHits++;
-  head='<div class="fb ok"><span class="t">🧭 ¡Lo resolviste paso a paso! +'+w+' pts</span>Modo guiado: mitad del puntaje, la racha se mantiene en '+streak+'.<br>';
+ else if(outcome==='guided'){const w=Math.max(0,half()-2*gRev);pts+=w;rPts+=w;rHits++;
+  head='<div class="fb ok"><span class="t">🧭 ¡Lo resolviste paso a paso! +'+w+' pts</span>Modo guiado: mitad del puntaje'+(gRev?' − 2 por cada paso revelado ('+gRev+')':'')+'. La racha se mantiene en '+streak+'.<br>';
   setTimeout(()=>boom(qi===RLEN()-1?3:1),30)}
  else if(outcome==='gaveup'){streak=0;
   head='<div class="fb bad"><span class="t">🏳️ Solución revelada · 0 pts</span>La racha vuelve a 0. Respuesta correcta: <b>'+cur.show+'</b><br>'}
@@ -407,20 +407,25 @@ function buildGuide(c){const g=c.g;if(g.type==='PB')return g.gs;if(g.type==='P')
   {lab:'P(Z < Z₁)',val:g.p1,tol:.0006,prob:true,q:'<b>Paso 5 · P(Z &lt; Z₁).</b> Como Z₁ es negativo, P(Z &lt; Z₁) es la colita izquierda: <b>1 − (valor del paso 4)</b>.',tip:'Es el espejo: la colita izquierda mide lo mismo que la colita derecha de |Z₁|.',tip2:'Calcula 1 − '+f4(g.T1)+'.'},
   {lab:'Probabilidad',val:g.ans,tol:.002,prob:true,q:'<b>Paso 6 · Respuesta final.</b> "Entre" es lo que queda bajo el valor mayor menos lo que queda bajo el valor menor: <b>P(Z &lt; Z₂) − P(Z &lt; Z₁)</b>. Resta el paso 3 menos el paso 5.',tip:'Al área grande (paso 3) le sacas la colita (paso 5).',tip2:'Calcula '+f4(g.T2)+' − '+f4(g.p1)+'.'}];
 }
-function startGuide(){gSteps=buildGuide(cur);gStep=0;gTries=0;gDone=[];renderGuide()}
+function startGuide(){gSteps=buildGuide(cur);gStep=0;gTries=0;gDone=[];gRev=0;renderGuide()}
 function renderGuide(){
  const st=gSteps[gStep];
  let h='<ul class="gdone">'+gDone.map(d=>'<li>✔ '+d+'</li>').join('')+'</ul><div class="gcur"><div style="font-size:12px;color:var(--mut);margin-bottom:4px">🧭 MODO GUIADO · paso '+(gStep+1)+' de '+gSteps.length+'</div>'+st.q;
  if(st.choice)h+='<div class="choice">'+st.opts.map(o=>'<button class="btn" data-v="'+o.v+'">'+o.l+'</button>').join('')+'</div>';
  else h+='<div class="ansrow" style="margin-top:10px"><input type="text" id="gin" placeholder="Tu resultado" autocomplete="off"><button class="btn pri" id="gchk">Comprobar ✓</button></div>';
- h+='<div class="err" id="gerr"></div><div id="gtip"></div></div><div style="text-align:right;margin-top:10px"><button class="btn sm" id="gup">🏳️ Ver solución (0 pts)</button></div>';
+ h+='<div class="err" id="gerr"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn sm" id="gmore">🔍 Más ayuda</button><button class="btn sm" id="gshow">👀 Ver el resultado de este paso (−2)</button></div><div id="gtip"></div></div><div style="text-align:right;margin-top:10px"><button class="btn sm" id="gup">🏳️ Ver toda la solución (0 pts)</button></div>';
  $('area').innerHTML=h;
  $('gup').onclick=()=>{$('area').querySelectorAll('button,input').forEach(e=>e.disabled=true);finish('gaveup')};
+ gHelp=0;$('gmore').onclick=()=>{gHelp++;$('gtip').innerHTML='<div class="gtip">💡 '+st.tip+(gHelp>=2?'<br>👉 <b>'+st.tip2+'</b>':'<br><span style="color:var(--mut)">Toca otra vez "Más ayuda" para ver exactamente qué calcular.</span>')+'</div>';if(gHelp>=2)$('gmore').disabled=true};
+ $('gshow').onclick=()=>revealStep();
  if(st.choice){$('area').querySelectorAll('.choice .btn').forEach(b=>b.onclick=()=>checkStep(b.dataset.v,b.textContent))}
  else{const gi=$('gin');gi.addEventListener('input',()=>$('gerr').textContent='');
   gi.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();checkStep()}});
   $('gchk').onclick=()=>checkStep();gi.focus({preventScroll:true});lastInput=gi}
 }
+function revealStep(){if(answered)return;const st=gSteps[gStep];gRev++;const shown=st.choice?(st.opts.find(o=>o.v===st.val)||{}).l:fmt(rnd(st.val,4));
+ gDone.push('Paso '+(gStep+1)+' · '+st.lab+': <b>'+shown+'</b> <span style="color:var(--gold)">(revelado: '+st.tip2.replace(/<[^>]+>/g,'').replace(/\.$/,'')+')</span>');gStep++;gTries=0;
+ if(gStep>=gSteps.length){$('area').innerHTML='<ul class="gdone">'+gDone.map(d=>'<li>✔ '+d+'</li>').join('')+'</ul>';finish('guided')}else renderGuide()}
 function checkStep(choice,label){
  if(answered)return;const st=gSteps[gStep];let ok,shown;
  if(st.choice){ok=choice===st.val;shown=label}
@@ -453,7 +458,7 @@ function exitGame(){
  if(!ox){ox=document.createElement('div');ox.className='overlay';ox.id='ovX';document.body.appendChild(ox)}
  ox.innerHTML='<div class="modal" style="max-width:420px;margin-top:15vh"><div class="center" style="font-size:40px">🚪</div><h2 class="center" style="margin:6px 0">¿Salir?</h2><p class="center" style="color:var(--mut)">'+(exam&&!exam.done?'Se pierde el simulacro en curso.':'Se pierde el avance de la ronda actual. Tus puntos totales ('+pts+') y tu récord se quedan guardados.')+'</p><div class="center" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn" id="exNo">Seguir</button><button class="btn pri" id="exYes">Sí, salir</button></div></div>';
  ox.classList.add('on');$('exNo').onclick=()=>ox.classList.remove('on');
- $('exYes').onclick=()=>{ox.classList.remove('on');updZ(false);clearInterval(exTimer);exam=null;
+ $('exYes').onclick=()=>{ox.classList.remove('on');updZ(false);$('fBtn').style.display='';clearInterval(exTimer);exam=null;
   $('sName').textContent='Fuera del juego';$('sProg').textContent='';
   $('main').innerHTML='<div class="center" style="font-size:44px">👋</div><h2 class="center" style="margin:6px 0">¡Hasta la próxima!</h2><p class="center">Puntos totales: <b>'+pts+'</b> · Récord de ronda: <b>'+best+'</b></p>'+
   '<p class="center" style="color:var(--mut)">Si esta ventana no se cierra sola, ciérrala con <b>Cmd + W</b> (Mac) o <b>Ctrl + W</b> (Windows), o con la ✕ de tu navegador.</p>'+
@@ -1100,7 +1105,7 @@ function buildExam(kind){const parts=kind===3?[1,2]:[kind];const qs=[];
 const notaCL=(p,P)=>{const e=.6*P;return rnd(p<e?1+3*p/e:4+3*(p-e)/(P-e),1)};
 const EXLIM=40*60000;
 const mmss=ms=>{const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
-function startExam(kind){exam=buildExam(kind);cur=null;answered=false;qi=0;updZ(kind===1);
+function startExam(kind){$('fBtn').style.display='none';exam=buildExam(kind);cur=null;answered=false;qi=0;updZ(kind===1);
  const nm=EXAM_SPEC[kind].name;$('sName').textContent='📝 Simulacro Prueba 2 · '+nm+' · '+exam.total+' pts';
  clearInterval(exTimer);const tick=()=>{if(!exam||exam.done)return;const left=EXLIM-(Date.now()-exam.t0);if(left<=0){exam.timeout=true;gradeExam();return}$('sProg').textContent='⏱ quedan '+mmss(left);$('sProg').style.color=left<5*60000?'var(--bad)':''};exTimer=setInterval(tick,1000);tick();
  STAGES.forEach((s,i)=>{const sg=$('seg'+i);if(sg){sg.firstChild.style.width='0%';sg.classList.remove('cur')}});
@@ -1267,6 +1272,15 @@ const STAGES_MIX=[
  Object.assign({},STAGES_UN[3],{n:1}),Object.assign({},STAGES_UN[5],{n:1}),
  Object.assign({},STAGES_EX[3],{n:1}),
  Object.assign({},STAGES_RL[2],{n:1}),Object.assign({},STAGES_RL[3],{n:1})];
+
+const CHEATKEY={U:'U',N:'N',P:'P',B:'B',PB:'PB',ED:'ED',EX:'EX',RL:'RL'};
+function openFormulas(){let o=$('ovF');if(!o){o=document.createElement('div');o.className='overlay';o.id='ovF';document.body.appendChild(o);o.addEventListener('click',e=>{if(e.target.id==='ovF')o.classList.remove('on')})}
+ const k=cur&&!answered&&CHEATKEY[cur.k]?cur.k:(cur&&CHEATKEY[cur.k]?cur.k:topic);
+ o.innerHTML='<div class="modal"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b style="font-size:18px">📘 Fórmulas</b><button class="btn sm" id="fClose">✕ Cerrar</button></div><div class="pills" style="margin-top:10px">'+['PB','B','P','N','EX','RL','U','ED'].map(t=>'<button class="btn sm'+(t===k?' pri':'')+'" data-ft="'+t+'">'+TOPIC_INFO[t][0]+'</button>').join('')+'</div><div id="fBody">'+cheatHTML(k)+'</div></div>';
+ o.classList.add('on');$('fClose').onclick=()=>o.classList.remove('on');
+ o.querySelectorAll('[data-ft]').forEach(b=>b.onclick=()=>{o.querySelectorAll('[data-ft]').forEach(x=>x.classList.toggle('pri',x===b));$('fBody').innerHTML=cheatHTML(b.dataset.ft)})}
+$('fBtn').onclick=openFormulas;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){const o=$('ovF');if(o)o.classList.remove('on')}});
 
 /* ---------- tabla Z ---------- */
 function buildTable(){let h='<tr><th>z</th>';for(let c=0;c<10;c++)h+='<th>0.0'+c+'</th>';h+='</tr>';
