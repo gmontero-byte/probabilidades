@@ -294,10 +294,10 @@ let guided=false,gSteps=null,gStep=0,gTries=0,gDone=[],lastInput=null,gRev=0,gHe
 const half=()=>Math.round(worth()/2);
 function setGuidedBtn(){}
 const TOPIC_INFO={PB:['🃏 Probabilidades','Clásica, suma, condicional, Bayes'],B:['🎯 Binomial','Exactamente, al menos, a lo más'],P:['🔢 Poisson','Exactamente, a lo más, más de'],N:['🔔 Normal','Con tabla Z'],EX:['⏳ Exponencial','Tiempos de espera y Poisson'],RL:['📈 Regresión lineal','Pendiente, predicción, r'],U:['📏 Uniforme','Menos de, más de, entre',1],ED:['📊 Descriptiva','Media, desviación, cuartiles',1]};
-function setTopic(t){if(t!==topic)round=1;topic=t;STAGES=(t==='EX'?STAGES_EX:t==='RL'?STAGES_RL:t==='ED'?STAGES_ED:t==='PB'?STAGES_PB:t==='U'?STAGES_U:t==='N'?STAGES_N:t==='P'?STAGES_P:t==='B'?STAGES_B:STAGES_MIX).filter(x=>x.n>0);rebuildPlan();buildStages();progress();hud(false)}
+function setTopic(t){if(t!==topic)round=getRound(t);topic=t;STAGES=(t==='EX'?STAGES_EX:t==='RL'?STAGES_RL:t==='ED'?STAGES_ED:t==='PB'?STAGES_PB:t==='U'?STAGES_U:t==='N'?STAGES_N:t==='P'?STAGES_P:t==='B'?STAGES_B:STAGES_MIX).filter(x=>x.n>0);rebuildPlan();buildStages();progress();hud(false)}
 function startScreen(){
  $('fBtn').style.display='';updZ(false);$('sName').textContent='Elige un tema';$('sProg').textContent='';
- const tb=k=>'<button class="btn'+(k===topic?' sel':'')+(TOPIC_INFO[k][2]?' nt':'')+'" data-t="'+k+'">'+TOPIC_INFO[k][0]+'<small>'+TOPIC_INFO[k][1]+'</small>'+(TOPIC_INFO[k][2]?'<span class="ntb">No entra en la Prueba 2</span>':'')+'</button>';
+ const tb=k=>'<button class="btn'+(k===topic?' sel':'')+(TOPIC_INFO[k][2]?' nt':'')+'" data-t="'+k+'">'+TOPIC_INFO[k][0]+'<small>'+TOPIC_INFO[k][1]+(getRound(k)>1?' · <b>Nivel '+getRound(k)+'</b>':'')+'</small>'+(TOPIC_INFO[k][2]?'<span class="ntb">No entra en la Prueba 2</span>':'')+'</button>';
  const best=k=>{let b='';try{b=localStorage.getItem('pdent_exam_'+k)||''}catch(e){}return b?'<br>⭐ Mejor nota: '+String(b).replace('.',','):''};
  $('main').innerHTML='<h2 class="center" style="margin:0 0 10px">🎮 Rondas cortas · 5 preguntas</h2>'+
  '<div class="topics">'+Object.keys(TOPIC_INFO).map(tb).join('')+'</div>'+
@@ -316,7 +316,8 @@ function setVal(){const v=$('valpill');if(!v)return;
 function next(){
  if(qi>=RLEN())return summary();
  const st=STAGES[PLAN[qi]];answered=false;hintUsed=false;guided=false;
- cur=st.k==='U'?genU(st.t,round):st.k==='N'?genN(st.t,round):st.k==='P'?genP(st.t,round):st.k==='PB'?genPB(st.t,round):st.k==='ED'?genED(st.t,round):st.k==='EX'?genEX(st.t,round):st.k==='RL'?genRL(st.t,round):genB(st.t,round);updZ(cur.k==='N');
+ const gen=()=>st.k==='U'?genU(st.t,round):st.k==='N'?genN(st.t,round):st.k==='P'?genP(st.t,round):st.k==='PB'?genPB(st.t,round):st.k==='ED'?genED(st.t,round):st.k==='EX'?genEX(st.t,round):st.k==='RL'?genRL(st.t,round):genB(st.t,round);
+ cur=gen();for(let k=0;k<25&&seenQ(cur);k++)cur=gen();markQ(cur);updZ(cur.k==='N');
  $('sName').textContent=st.name(round);$('sProg').textContent='Pregunta '+(qi+1)+' de '+RLEN()+' · Dificultad '+DIFF(round);
  progress();
  $('main').innerHTML='<div class="pills"><span class="pill '+cur.k.toLowerCase()+'">'+({U:'Uniforme',N:'Normal',P:'Poisson',B:'Binomial',PB:'Probabilidades',ED:'Descriptiva',EX:'Exponencial',RL:'Regresión'})[cur.k]+'</span><span class="pill">Ronda '+round+'</span><span id="valpill"></span></div>'+
@@ -451,7 +452,7 @@ function summary(){
  '<p class="center">'+msg+'</p><div class="center" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn sm" id="chg">🏠 Inicio</button><button class="btn sm" id="rep">↻ Repetir ronda '+round+'</button><button class="btn pri" id="up">Ronda '+(round+1)+': '+DIFF(round+1)+' ➜</button></div>';
  if(rHits>=RLEN()*.7)setTimeout(()=>boom(3),100);
  $('rep').onclick=()=>{qi=0;rPts=0;rHits=0;next()};$('chg').onclick=()=>{qi=0;rPts=0;rHits=0;cur=null;progress();startScreen()};
- $('up').onclick=()=>{round++;qi=0;rPts=0;rHits=0;hud(false);next()};
+ $('up').onclick=()=>{round++;saveRound();qi=0;rPts=0;rHits=0;hud(false);next()};
 }
 function exitGame(){
  $('ov').classList.remove('on');$('calcP').classList.remove('on');let ox=$('ovX');
@@ -802,7 +803,7 @@ function pbComb(r){const c=r===1?PCOMB[0]:pick(PCOMB);let a,b,m;
    gstep('Formas favorables',F,'<b>Paso 2 · Formas favorables:</b> escoger '+x+' de los '+a+' '+c.A[1]+(y?' <b>y</b> '+y+' de los '+b+' '+c.B[1]+' (se multiplican)':'')+'.','Usa combinaciones para cada grupo y multiplícalas.','Calcula '+a+' nCr '+x+(y?' × '+b+' nCr '+y:'')+'.'),
    gstep('Probabilidad',ans,'<b>Paso 3 · Probabilidad:</b> favorables ÷ totales.','Divide el paso 2 por el paso 1.','Calcula '+F+' ÷ '+T+'.',true)],null,simp(F,T).join('/')+' ≈ '+f4(ans));
 }
-function genPB(t,r){if(t==='ind'&&Math.random()<.35)t='comb';return({cl:pbCl,suma:pbSuma,ind:pbInd,cond:pbCond,bayes:pbBayes,comb:pbComb})[t](r)}
+function genPB(t,r){if(r===1&&Math.random()<.5)r=2;if(t==='ind'&&Math.random()<.35)t='comb';return({cl:pbCl,suma:pbSuma,ind:pbInd,cond:pbCond,bayes:pbBayes,comb:pbComb})[t](r)}
 
 
 /* ---------- Estadística descriptiva (Guía Unidad 1) ---------- */
@@ -944,7 +945,7 @@ function edInt(r){const c=r===1?pick(EDI.slice(0,2)):pick(EDI);let iv,fs;
  const cv=sd/m;return edOut({text:head+'Estime el <b>coeficiente de variación</b> (en %).',ans:cv,alts:[cv,sdP/m],tol:.006,num:false,show:fmt(rnd(cv*100,1))+'%',plot:P(),steps:[mks,'Media '+M('\\bar{x}\\approx '+f2(m))+' · desviación '+M('s\\approx '+f2(sd)),M('CV='+MF('s','\\bar{x}')+'\\cdot 100\\%\\approx '+fmt(rnd(cv*100,1))+'\\%')],rule:'El CV compara la dispersión con la media. Aquí la desviación es el '+fmt(rnd(cv*100,1))+'% de la media.',
   g:{type:'PB',gs:[gm[0],gm[1],gm[2],{lab:'Desviación estándar',val:sd,tol:Math.max(.02,sd*.01),q:'<b>Paso 4 · Desviación estándar</b> con las marcas: '+M('s=\\sqrt{'+MF('\\sum f_{i}(m_{i}−\\bar{x})^{2}','n−1')+'}'),tip:'Para cada intervalo: (marca − media)², por su frecuencia; súmalos, divide por n − 1 y saca la raíz.',tip2:'Debe darte cerca de '+f2(sd)+'.'},{lab:'CV',val:cv,tol:.006,prob:true,q:'<b>Paso 5 ·</b> '+M('CV='+MF('s','\\bar{x}')),tip:'Divide el paso 4 por el paso 3.',tip2:'Calcula '+f2(sd)+' ÷ '+f2(m)+'.'}]}});
 }
-function genED(t,r){if(t==='frq'&&Math.random()<.4)t='int';if(t==='vf')return edVF(r);if(t==='frq')return edFreq(r);if(t==='int')return edInt(r);const q=edListQ(t,r);q.copy=q.text.match(/<table class="bt dt">([\s\S]*?)<\/table>/)?[...q.text.matchAll(/<td>([^<]*)<\/td>/g)].map(x=>x[1]).join('\n'):'';return q}
+function genED(t,r){if(r===1&&t!=='vf'&&Math.random()<.5)r=2;if(t==='frq'&&Math.random()<.4)t='int';if(t==='vf')return edVF(r);if(t==='frq')return edFreq(r);if(t==='int')return edInt(r);const q=edListQ(t,r);q.copy=q.text.match(/<table class="bt dt">([\s\S]*?)<\/table>/)?[...q.text.matchAll(/<td>([^<]*)<\/td>/g)].map(x=>x[1]).join('\n'):'';return q}
 
 
 /* ---------- Exponencial ---------- */
@@ -1281,6 +1282,14 @@ function openFormulas(){let o=$('ovF');if(!o){o=document.createElement('div');o.
  o.querySelectorAll('[data-ft]').forEach(b=>b.onclick=()=>{o.querySelectorAll('[data-ft]').forEach(x=>x.classList.toggle('pri',x===b));$('fBody').innerHTML=cheatHTML(b.dataset.ft)})}
 $('fBtn').onclick=openFormulas;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){const o=$('ovF');if(o)o.classList.remove('on')}});
+
+/* ---------- memoria: nivel por tema y preguntas recientes ---------- */
+function getRound(t){try{return Math.max(1,parseInt(localStorage.getItem('pdent_round_'+t))||1)}catch(e){return 1}}
+function saveRound(){try{localStorage.setItem('pdent_round_'+topic,round)}catch(e){}}
+const qKey=c=>String(c.text).replace(/<[^>]+>/g,'').replace(/\s+/g,' ').slice(0,220);
+let RECENT=[];try{RECENT=JSON.parse(localStorage.getItem('pdent_recent')||'[]')}catch(e){}
+function seenQ(c){return RECENT.includes(qKey(c))}
+function markQ(c){RECENT.push(qKey(c));RECENT=RECENT.slice(-80);try{localStorage.setItem('pdent_recent',JSON.stringify(RECENT))}catch(e){}}
 
 /* ---------- tabla Z ---------- */
 function buildTable(){let h='<tr><th>z</th>';for(let c=0;c<10;c++)h+='<th>0.0'+c+'</th>';h+='</tr>';
